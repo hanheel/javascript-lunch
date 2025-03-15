@@ -500,9 +500,9 @@ const _FoodItem = class _FoodItem {
   }
   getBookmarkIconSrc() {
     if (__privateGet(this, _isFavorite)) {
-      return "/favorite-icon-filled.png";
+      return "./favorite-icon-filled.png";
     }
-    return "/favorite-icon-lined.png";
+    return "./favorite-icon-lined.png";
   }
   setCss() {
     var _a;
