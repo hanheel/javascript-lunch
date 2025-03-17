@@ -8,7 +8,7 @@ var __accessCheck = (obj, member, msg) => member.has(obj) || __typeError("Cannot
 var __privateGet = (obj, member, getter) => (__accessCheck(obj, member, "read from private field"), getter ? getter.call(obj) : member.get(obj));
 var __privateAdd = (obj, member, value) => member.has(obj) ? __typeError("Cannot add the same private member more than once") : member instanceof WeakSet ? member.add(obj) : member.set(obj, value);
 var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "write to private field"), setter ? setter.call(obj, value) : member.set(obj, value), value);
-var _selectValue, _isOpen, _content, _container, _data, _id, _category, _name, _distance, _description, _link, _isFavorite, _cssType, _isModalFoodItem, _originFoodItems, _renderFoodItems, _currentMenu;
+var _selectValue, _isOpen, _content, _container, _data, _cssType, _onFavoriteClick, _onDeleteClick, _onFoodItemClick, _foodItems, _selectedFilter, _selectedSortType, _currentMenu, _currentMenu2, _onTabChange;
 (function polyfill() {
   const relList = document.createElement("link").relList;
   if (relList && relList.supports && relList.supports("modulepreload")) {
@@ -46,32 +46,18 @@ var _selectValue, _isOpen, _content, _container, _data, _id, _category, _name, _
     fetch(link.href, fetchOpts);
   }
 })();
-let filterChangeListeners = [];
-function addFilterChangeListeners(listener) {
-  filterChangeListeners.push(listener);
-}
-function notifyFilterChange(id) {
-  filterChangeListeners.forEach((listener) => listener(id));
-}
-let sortChangeListeners = [];
-function addSortChangeListeners(listener) {
-  sortChangeListeners.push(listener);
-}
-function notifySortChange(id) {
-  sortChangeListeners.forEach((listener) => listener(id));
-}
 class Dropdown {
-  constructor({ name, options, type }) {
+  constructor({ name, options, onChange }) {
     __publicField(this, "container");
     __publicField(this, "name");
     __publicField(this, "options");
-    __publicField(this, "type");
+    __publicField(this, "onChange");
     __privateAdd(this, _selectValue);
     this.container = document.createElement("div");
     this.options = options;
     this.name = name;
-    this.type = type;
-    __privateSet(this, _selectValue, "");
+    __privateSet(this, _selectValue, "이름순");
+    this.onChange = onChange;
     this.render();
     this.setDropdownValue();
   }
@@ -92,13 +78,9 @@ class Dropdown {
     this.container.querySelectorAll("select").forEach(
       (element) => element.addEventListener("change", (event) => {
         const target = event.target;
-        if (target && this.type === "filter") {
+        if (target instanceof HTMLSelectElement) {
           __privateSet(this, _selectValue, target.value);
-          notifyFilterChange(__privateGet(this, _selectValue));
-        }
-        if (target && this.type === "sort") {
-          __privateSet(this, _selectValue, target.value);
-          notifySortChange(__privateGet(this, _selectValue));
+          this.onChange(__privateGet(this, _selectValue));
         }
       })
     );
@@ -165,6 +147,7 @@ const CAPTION = {
   link: "매장 정보를 확인할 수 있는 링크를 입력해 주세요"
 };
 const DELETE = "정말 삭제하시겠습니까? 삭제 이후에는 복구할 수 없습니다.";
+const EMPTY_LIST = "음식점이 없습니다.";
 const ERROR_MESSAGE = {
   required: "필수 입력 항목이 비어있습니다.",
   length: (length) => `최대 ${length}자까지 입력할 수 있습니다.`,
@@ -280,7 +263,7 @@ function alertError(error) {
   }
 }
 class FoodForm {
-  constructor({ onModalClose = () => {
+  constructor({ onCancel = () => {
   }, onSubmit = () => {
   } }) {
     __publicField(this, "container");
@@ -336,7 +319,7 @@ class FoodForm {
             name: "cancel",
             cssType: "secondary",
             innerText: "취소하기",
-            onClick: onModalClose
+            onClick: onCancel
           }),
           Button({
             name: "submit",
@@ -381,53 +364,6 @@ class FoodForm {
     return this.container;
   }
 }
-let deleteChangeListeners = [];
-function addDeleteItemChangeListeners(listener) {
-  deleteChangeListeners.push(listener);
-}
-function notifyDeleteChange(id) {
-  deleteChangeListeners.forEach((listener) => listener(id));
-}
-let favoriteChangeListeners = [];
-function addFavoriteChangeListeners(listener) {
-  favoriteChangeListeners.push(listener);
-}
-function notifyFavoriteChange(id) {
-  favoriteChangeListeners.forEach((listener) => listener(id));
-}
-function storeFoodItems(foodItems) {
-  localStorage.setItem("foodItems", JSON.stringify(foodItems));
-}
-function getStoredFoodItems() {
-  const storedItems = localStorage.getItem("foodItems");
-  if (storedItems) return JSON.parse(storedItems);
-  return [];
-}
-function removeStoredFoodItem(id) {
-  const filteredItems = getStoredFoodItems().filter((item) => item.id !== id);
-  localStorage.setItem("foodItems", JSON.stringify(filteredItems));
-}
-function toggleFavorite(id) {
-  const resultItems = getStoredFoodItems().map((foodItem) => {
-    if (foodItem.id === id) {
-      return { ...foodItem, isFavorite: !foodItem.isFavorite };
-    }
-    return foodItem;
-  });
-  storeFoodItems(resultItems);
-  notifyFavoriteChange(id);
-}
-const categoryMap = {
-  한식: { imgAlt: "한식", imgSrc: "./category-korean.png" },
-  중식: { imgAlt: "중식", imgSrc: "./category-chinese.png" },
-  일식: { imgAlt: "일식", imgSrc: "./category-japanese.png" },
-  양식: { imgAlt: "양식", imgSrc: "./category-western.png" },
-  아시안: { imgAlt: "아시안", imgSrc: "./category-asian.png" },
-  기타: { imgAlt: "기타", imgSrc: "./category-etc.png" }
-};
-function getImgSrcAlt(category) {
-  return categoryMap[category] || categoryMap["기타"];
-}
 class Modal {
   constructor({ content }) {
     __privateAdd(this, _isOpen, false);
@@ -464,54 +400,40 @@ class Modal {
 _isOpen = new WeakMap();
 _content = new WeakMap();
 _container = new WeakMap();
-const _FoodItem = class _FoodItem {
-  constructor({ data, cssType, isModalFoodItem = false }) {
+const categoryMap = {
+  한식: { imgAlt: "한식", imgSrc: "./category-korean.png" },
+  중식: { imgAlt: "중식", imgSrc: "./category-chinese.png" },
+  일식: { imgAlt: "일식", imgSrc: "./category-japanese.png" },
+  양식: { imgAlt: "양식", imgSrc: "./category-western.png" },
+  아시안: { imgAlt: "아시안", imgSrc: "./category-asian.png" },
+  기타: { imgAlt: "기타", imgSrc: "./category-etc.png" }
+};
+function getImgSrcAlt(category) {
+  return categoryMap[category] || categoryMap["기타"];
+}
+class FoodItem {
+  constructor({ data, cssType, onFavoriteClick, onDeleteClick, onFoodItemClick }) {
     __publicField(this, "container");
     __privateAdd(this, _data);
-    __privateAdd(this, _id);
-    __privateAdd(this, _category);
-    __privateAdd(this, _name);
-    __privateAdd(this, _distance);
-    __privateAdd(this, _description);
-    __privateAdd(this, _link);
-    __privateAdd(this, _isFavorite);
     __privateAdd(this, _cssType);
-    __privateAdd(this, _isModalFoodItem);
+    __privateAdd(this, _onFavoriteClick);
+    __privateAdd(this, _onDeleteClick);
+    __privateAdd(this, _onFoodItemClick);
     __privateSet(this, _data, data);
     __privateSet(this, _cssType, cssType);
-    __privateSet(this, _isModalFoodItem, isModalFoodItem);
-    __privateSet(this, _id, data.id);
-    __privateSet(this, _category, data.category);
-    __privateSet(this, _name, data.name);
-    __privateSet(this, _distance, data.distance);
-    __privateSet(this, _description, data.description);
-    __privateSet(this, _isFavorite, data.isFavorite);
-    __privateSet(this, _link, data.link);
+    __privateSet(this, _onFavoriteClick, onFavoriteClick);
+    __privateSet(this, _onDeleteClick, onDeleteClick);
+    __privateSet(this, _onFoodItemClick, onFoodItemClick);
     this.container = document.createElement("div");
     this.render();
     this.setUpFavoriteToggle();
-    this.setCss();
-    if (!__privateGet(this, _isModalFoodItem)) {
-      this.showDetail();
-    }
+    this.setUpDetailModal();
   }
   get element() {
     return this.container.firstElementChild;
   }
-  getBookmarkIconSrc() {
-    if (__privateGet(this, _isFavorite)) {
-      return "./favorite-icon-filled.png";
-    }
-    return "./favorite-icon-lined.png";
-  }
-  setCss() {
-    var _a;
-    if (__privateGet(this, _cssType) === "column") {
-      (_a = this.container.querySelector("li")) == null ? void 0 : _a.classList.add("restaurant-detail");
-    }
-  }
   render() {
-    const { imgAlt, imgSrc } = getImgSrcAlt(__privateGet(this, _category));
+    const { imgAlt, imgSrc } = getImgSrcAlt(__privateGet(this, _data).category);
     this.container.innerHTML = `
               <li class="restaurant">
             <div class="restaurant__category">
@@ -522,109 +444,179 @@ const _FoodItem = class _FoodItem {
               />
             </div>
             <div class="restaurant__info">
-              <h3 class="restaurant__name text-subtitle">${__privateGet(this, _name)}</h3>
+              <h3 class="restaurant__name text-subtitle">${__privateGet(this, _data).name}</h3>
               <span class="restaurant__distance text-body"
-                >캠퍼스부터 ${__privateGet(this, _distance)}분 내</span
+                >캠퍼스부터 ${__privateGet(this, _data).distance}분 내</span
               >
               <p class="restaurant__description ${__privateGet(this, _cssType) === "column" ? "restaurant__description-detail" : ""} text-body">
-               ${__privateGet(this, _description)}
+               ${__privateGet(this, _data).description}
               </p>
-              ${__privateGet(this, _cssType) === "column" && __privateGet(this, _link) ? `<p>${__privateGet(this, _link)}</p>` : ""}
+              ${__privateGet(this, _cssType) === "column" && __privateGet(this, _data).link ? `<p>${__privateGet(this, _data).link}</p>` : ""}
               <img src=${this.getBookmarkIconSrc()} alt="즐겨찾기" class="favorite-icon">
             </div>
           </li>
   `;
+    this.setDetailCss();
   }
   setUpFavoriteToggle() {
     const bookmarkIcon = this.container.querySelector(".favorite-icon");
     if (!bookmarkIcon) return;
-    bookmarkIcon.addEventListener("click", (event) => {
-      event.stopPropagation();
-      __privateSet(this, _isFavorite, !__privateGet(this, _isFavorite));
-      bookmarkIcon.setAttribute("src", this.getBookmarkIconSrc());
-      toggleFavorite(__privateGet(this, _id));
-      this.render();
-    });
+    bookmarkIcon.addEventListener("click", this.handleFavoriteClick.bind(this));
   }
-  showDetail() {
+  handleFavoriteClick(event) {
+    event.stopPropagation();
+    this.updateFavoriteIcon();
+    __privateGet(this, _onFavoriteClick).call(this, __privateGet(this, _data).id);
+    this.render();
+  }
+  updateFavoriteIcon() {
+    const bookmarkIcon = this.container.querySelector(".favorite-icon");
+    if (!bookmarkIcon) return;
+    bookmarkIcon.setAttribute("src", this.getBookmarkIconSrc());
+  }
+  getBookmarkIconSrc() {
+    if (__privateGet(this, _data).isFavorite) {
+      return "./favorite-icon-filled.png";
+    }
+    return "./favorite-icon-lined.png";
+  }
+  setDetailCss() {
     var _a;
-    (_a = this.container.querySelector("li")) == null ? void 0 : _a.addEventListener("click", () => {
-      var _a2;
-      if (__privateGet(this, _isModalFoodItem)) return;
-      const fragment = document.createDocumentFragment();
-      const detailFoodItem = new _FoodItem({
-        data: __privateGet(this, _data),
-        cssType: "column",
-        isModalFoodItem: true
-      });
-      if (!detailFoodItem.element) return;
-      fragment.appendChild(detailFoodItem.element);
-      const buttonContainer = ButtonContainer({
-        buttons: [
-          Button({
-            name: "delete",
-            innerText: "삭제하기",
-            cssType: "secondary",
-            onClick: () => {
-              detailFoodItem.deleteItem();
-              detailModal.close();
-            }
-          }),
-          Button({ name: "close", innerText: "닫기", onClick: () => detailModal.close() })
-        ]
-      });
-      fragment.appendChild(buttonContainer);
-      const detailModal = new Modal({ content: fragment });
-      detailModal.open();
-      (_a2 = document.querySelector("body")) == null ? void 0 : _a2.appendChild(detailModal.element);
-    });
-  }
-  deleteItem() {
-    if (confirm(DELETE)) {
-      notifyDeleteChange(__privateGet(this, _id));
-      removeStoredFoodItem(__privateGet(this, _id));
-      this.render();
+    if (__privateGet(this, _cssType) === "column") {
+      (_a = this.container.querySelector("li")) == null ? void 0 : _a.classList.add("restaurant-detail");
     }
   }
-};
+  setUpDetailModal() {
+    var _a;
+    (_a = this.container.querySelector("li")) == null ? void 0 : _a.addEventListener("click", () => {
+      __privateGet(this, _onFoodItemClick).call(this, __privateGet(this, _data));
+    });
+  }
+  handleDeleteClick() {
+    if (confirm(DELETE)) {
+      __privateGet(this, _onDeleteClick).call(this, __privateGet(this, _data).id);
+    }
+  }
+}
 _data = new WeakMap();
-_id = new WeakMap();
-_category = new WeakMap();
-_name = new WeakMap();
-_distance = new WeakMap();
-_description = new WeakMap();
-_link = new WeakMap();
-_isFavorite = new WeakMap();
 _cssType = new WeakMap();
-_isModalFoodItem = new WeakMap();
-let FoodItem = _FoodItem;
+_onFavoriteClick = new WeakMap();
+_onDeleteClick = new WeakMap();
+_onFoodItemClick = new WeakMap();
+function storeFoodItems(foodItems) {
+  localStorage.setItem("foodItems", JSON.stringify(foodItems));
+}
+function getStoredFoodItems() {
+  const storedItems = localStorage.getItem("foodItems");
+  return storedItems ? JSON.parse(storedItems) : [];
+}
+function removeStoredFoodItem(id) {
+  const filteredItems = getStoredFoodItems().filter((item) => item.id !== id);
+  localStorage.setItem("foodItems", JSON.stringify(filteredItems));
+}
+function filterFoodItemsByCategory(category, foodItems) {
+  if (category === "") {
+    return foodItems;
+  }
+  return foodItems.filter((foodItem) => foodItem.category === category);
+}
+function sortFoodItem(sortOption, foodItems) {
+  if (sortOption === "이름순") {
+    foodItems.sort((a, b) => a.name.localeCompare(b.name));
+  }
+  if (sortOption === "거리순") {
+    foodItems.sort((a, b) => a.distance - b.distance);
+  }
+  return foodItems;
+}
+class FoodListManager {
+  constructor(initialFoodItems) {
+    __privateAdd(this, _foodItems);
+    __privateAdd(this, _selectedFilter, "");
+    __privateAdd(this, _selectedSortType, "이름순");
+    __privateAdd(this, _currentMenu, "all");
+    __privateSet(this, _foodItems, initialFoodItems);
+  }
+  getItems() {
+    return [...__privateGet(this, _foodItems)];
+  }
+  setFilterType(category) {
+    __privateSet(this, _selectedFilter, category);
+  }
+  setSortType(sortType) {
+    __privateSet(this, _selectedSortType, sortType);
+  }
+  setCurrentMenu(currentMenu) {
+    __privateSet(this, _currentMenu, currentMenu);
+  }
+  processFoodItems() {
+    const filteredFavoriteFoodItems = this.filterFavoriteFoodItems(__privateGet(this, _currentMenu));
+    const filteredFoodItems = filterFoodItemsByCategory(__privateGet(this, _selectedFilter), filteredFavoriteFoodItems);
+    return sortFoodItem(__privateGet(this, _selectedSortType), filteredFoodItems);
+  }
+  addItem(foodItem) {
+    __privateSet(this, _foodItems, [...__privateGet(this, _foodItems), foodItem]);
+    storeFoodItems(__privateGet(this, _foodItems));
+  }
+  deleteFoodItem(id) {
+    removeStoredFoodItem(id);
+    __privateSet(this, _foodItems, __privateGet(this, _foodItems).filter((foodItem) => foodItem.id !== id));
+    storeFoodItems(__privateGet(this, _foodItems));
+  }
+  toggleFavoriteFoodItem(id) {
+    __privateSet(this, _foodItems, __privateGet(this, _foodItems).map((foodItem) => {
+      if (foodItem.id === id) {
+        return { ...foodItem, isFavorite: !foodItem.isFavorite };
+      }
+      return foodItem;
+    }));
+    storeFoodItems(__privateGet(this, _foodItems));
+  }
+  filterFavoriteFoodItems(tabMenu) {
+    let favoriteFoodItems;
+    if (tabMenu === "favorite") {
+      favoriteFoodItems = __privateGet(this, _foodItems).filter((foodItem) => foodItem.isFavorite);
+      return favoriteFoodItems;
+    }
+    return [...__privateGet(this, _foodItems)];
+  }
+}
+_foodItems = new WeakMap();
+_selectedFilter = new WeakMap();
+_selectedSortType = new WeakMap();
+_currentMenu = new WeakMap();
 class FoodList {
   constructor({ foodItems }) {
-    __privateAdd(this, _originFoodItems);
-    __privateAdd(this, _renderFoodItems);
+    __publicField(this, "foodListManager");
     __publicField(this, "foodList");
-    __privateSet(this, _originFoodItems, foodItems);
-    __privateSet(this, _renderFoodItems, foodItems);
+    this.foodListManager = new FoodListManager(foodItems);
     this.foodList = document.createElement("ul");
     this.foodList.className = "restaurant-list";
     this.updateSortItem("이름순");
-    addFavoriteChangeListeners(this.updateFavoriteItem.bind(this));
-    addDeleteItemChangeListeners(this.updateDeleteItem.bind(this));
-    addFilterChangeListeners(this.updateFilterItem.bind(this));
-    addSortChangeListeners(this.updateSortItem.bind(this));
-    this.render();
   }
   get element() {
     return this.foodList;
   }
-  render() {
+  render(foodItems = this.foodListManager.getItems()) {
     this.foodList.innerHTML = "";
-    this.checkAndRenderEmptyList();
+    if (foodItems.length === 0) {
+      this.showEmptyListMessage();
+      return;
+    }
     const foodFragment = document.createDocumentFragment();
-    __privateGet(this, _renderFoodItems).forEach((foodItem) => {
+    foodItems.forEach((foodItem) => {
       const foodItemElement = new FoodItem({
         data: foodItem,
-        cssType: "row"
+        cssType: "row",
+        onFavoriteClick: (id) => {
+          this.updateFavoriteItem(id);
+        },
+        onDeleteClick: (id) => {
+          this.updateDeleteItem(id);
+        },
+        onFoodItemClick: (foodItem2) => {
+          this.renderDetailModal(foodItem2);
+        }
       }).element;
       if (foodItemElement) {
         foodFragment.appendChild(foodItemElement);
@@ -632,69 +624,77 @@ class FoodList {
     });
     this.foodList.appendChild(foodFragment);
   }
-  checkAndRenderEmptyList() {
-    if (__privateGet(this, _originFoodItems).length === 0) {
-      this.foodList.innerHTML = `
-      <p class="empty-message">음식점이 없습니다. 우측 상단 버튼을 눌러 추가해 주세요.</p>
+  renderDetailModal(foodItem) {
+    const fragment = document.createDocumentFragment();
+    const detailFoodItem = new FoodItem({
+      data: foodItem,
+      cssType: "column",
+      onFavoriteClick: (id) => {
+        this.updateFavoriteItem(id);
+      },
+      onDeleteClick: (id) => {
+        this.updateDeleteItem(id);
+        detailModal.close();
+      },
+      onFoodItemClick: () => {
+      }
+    });
+    if (!detailFoodItem.element) return;
+    fragment.appendChild(detailFoodItem.element);
+    const buttonContainer = ButtonContainer({
+      buttons: [
+        Button({
+          name: "delete",
+          innerText: "삭제하기",
+          cssType: "secondary",
+          onClick: () => {
+            this.updateDeleteItem(foodItem.id);
+            detailModal.close();
+          }
+        }),
+        Button({ name: "close", innerText: "닫기", onClick: () => detailModal.close() })
+      ]
+    });
+    fragment.appendChild(buttonContainer);
+    const detailModal = new Modal({ content: fragment });
+    detailModal.open();
+    document.body.appendChild(detailModal.element);
+  }
+  showEmptyListMessage() {
+    this.foodList.innerHTML = `
+      <p class="empty-message">${EMPTY_LIST}</p>
     `;
-      return;
-    }
-    if (__privateGet(this, _renderFoodItems).length === 0) {
-      this.foodList.innerHTML = `
-        <p class="empty-message">즐겨찾기한 음식점이 없습니다.</p>
-      `;
-      return;
-    }
   }
-  addItem(foodItem) {
-    __privateSet(this, _originFoodItems, [...__privateGet(this, _originFoodItems), foodItem]);
-    __privateSet(this, _renderFoodItems, __privateGet(this, _originFoodItems));
-    storeFoodItems(__privateGet(this, _originFoodItems));
-    this.render();
-  }
-  filterFavoriteItem() {
-    __privateSet(this, _renderFoodItems, __privateGet(this, _originFoodItems).filter((foodItem) => foodItem.isFavorite));
-    this.render();
-  }
-  resetFavoriteFilter() {
-    __privateSet(this, _renderFoodItems, __privateGet(this, _originFoodItems));
+  updateAddItem(foodItem) {
+    this.foodListManager.addItem(foodItem);
     this.render();
   }
   updateFavoriteItem(id) {
-    __privateSet(this, _originFoodItems, __privateGet(this, _originFoodItems).map((foodItem) => {
-      if (foodItem.id === id) {
-        foodItem.isFavorite = !foodItem.isFavorite;
-      }
-      return foodItem;
-    }));
-    this.render();
+    this.foodListManager.toggleFavoriteFoodItem(id);
+    this.render(this.foodListManager.processFoodItems());
   }
   updateDeleteItem(id) {
-    __privateSet(this, _originFoodItems, __privateGet(this, _originFoodItems).filter((foodItem) => foodItem.id !== id));
-    __privateSet(this, _renderFoodItems, __privateGet(this, _originFoodItems));
-    this.render();
+    if (confirm(DELETE)) {
+      this.foodListManager.deleteFoodItem(id);
+      this.render();
+    }
   }
   updateFilterItem(category) {
-    if (category === "") {
-      __privateSet(this, _renderFoodItems, __privateGet(this, _originFoodItems));
-      this.render();
-      return;
-    }
-    __privateSet(this, _renderFoodItems, __privateGet(this, _originFoodItems).filter((foodItem) => foodItem.category === category));
-    this.render();
+    this.foodListManager.setFilterType(category);
+    const filteredItems = this.foodListManager.processFoodItems();
+    this.render(filteredItems);
   }
   updateSortItem(sortType) {
-    if (sortType === "이름순") {
-      __privateGet(this, _renderFoodItems).sort((a, b) => a.name.localeCompare(b.name));
-    }
-    if (sortType === "거리순") {
-      __privateGet(this, _renderFoodItems).sort((a, b) => a.distance - b.distance);
-    }
-    this.render();
+    this.foodListManager.setSortType(sortType);
+    const sortedItems = this.foodListManager.processFoodItems();
+    this.render(sortedItems);
+  }
+  updateFavoriteList(tabMenu) {
+    this.foodListManager.setCurrentMenu(tabMenu);
+    const favoriteItems = this.foodListManager.processFoodItems();
+    this.render(favoriteItems);
   }
 }
-_originFoodItems = new WeakMap();
-_renderFoodItems = new WeakMap();
 function IconButton({ cssType = "primary", name, imgSrc, label, onClick = () => {
 } }) {
   const container = document.createElement("div");
@@ -726,14 +726,21 @@ function Header({ title = "제목", onAddClick = () => {
   return header;
 }
 class TabMenu {
-  constructor() {
+  constructor({ onTabChange }) {
     __publicField(this, "container");
-    __privateAdd(this, _currentMenu, "all");
-    __publicField(this, "onTabChange", () => {
+    __privateAdd(this, _currentMenu2, "all");
+    __privateAdd(this, _onTabChange, () => {
     });
     this.container = document.createElement("div");
     this.container.classList.add("tabmenu-container");
     this.render();
+    __privateSet(this, _onTabChange, onTabChange);
+  }
+  get element() {
+    return this.container;
+  }
+  get currentMenu() {
+    return __privateGet(this, _currentMenu2);
   }
   render() {
     this.container.innerHTML = `
@@ -751,9 +758,9 @@ class TabMenu {
         if (!target) return;
         const currentMenu = target.dataset.tab;
         if (currentMenu === "all" || currentMenu === "favorite") {
-          __privateSet(this, _currentMenu, currentMenu);
+          __privateSet(this, _currentMenu2, currentMenu);
           this.setActiveTabStyle();
-          this.onTabChange();
+          __privateGet(this, _onTabChange).call(this, this.currentMenu);
         }
       })
     );
@@ -761,16 +768,11 @@ class TabMenu {
   setActiveTabStyle() {
     var _a, _b;
     (_a = this.container.querySelector(".tabmenu--active")) == null ? void 0 : _a.classList.remove("tabmenu--active");
-    (_b = this.container.querySelector(`[data-tab=${__privateGet(this, _currentMenu)}]`)) == null ? void 0 : _b.classList.add("tabmenu--active");
-  }
-  get element() {
-    return this.container;
-  }
-  get currentMenu() {
-    return __privateGet(this, _currentMenu);
+    (_b = this.container.querySelector(`[data-tab=${__privateGet(this, _currentMenu2)}]`)) == null ? void 0 : _b.classList.add("tabmenu--active");
   }
 }
-_currentMenu = new WeakMap();
+_currentMenu2 = new WeakMap();
+_onTabChange = new WeakMap();
 class MainPage {
   constructor() {
     __publicField(this, "container");
@@ -778,50 +780,46 @@ class MainPage {
     __publicField(this, "modal");
     __publicField(this, "foodForm");
     __publicField(this, "tabMenu");
+    __publicField(this, "filterDropdown");
+    __publicField(this, "sortDropdown");
     __publicField(this, "dropdownContainer");
     this.foodList = new FoodList({ foodItems: getStoredFoodItems() });
     this.foodForm = new FoodForm({
-      onModalClose: () => this.modal.close(),
-      onSubmit: this.handleSubmit.bind(this)
+      onCancel: () => this.modal.close(),
+      onSubmit: (formItem) => this.handleSubmit(formItem)
     });
     this.modal = new Modal({
       content: this.foodForm.element
     });
-    this.tabMenu = new TabMenu();
-    this.tabMenu.onTabChange = () => {
-      this.render();
-    };
-    const dropdowns = [
-      new Dropdown({ name: "category", options: DROPDOWN_OPTIONS.category, type: "filter" }),
-      new Dropdown({ name: "sort", options: DROPDOWN_OPTIONS.sort, type: "sort" })
-    ];
-    this.dropdownContainer = new DropdownContainer({ dropdowns });
+    this.tabMenu = new TabMenu({ onTabChange: (currentMenu) => this.foodList.updateFavoriteList(currentMenu) });
+    this.filterDropdown = new Dropdown({ name: "category", options: DROPDOWN_OPTIONS.category, onChange: this.handleFilterChange.bind(this) });
+    this.sortDropdown = new Dropdown({ name: "sort", options: DROPDOWN_OPTIONS.sort, onChange: this.handleSortChange.bind(this) });
+    this.dropdownContainer = new DropdownContainer({ dropdowns: [this.filterDropdown, this.sortDropdown] });
     this.container = document.createElement("div");
+    this.render();
+  }
+  handleFilterChange() {
+    this.foodList.updateFilterItem(this.filterDropdown.selectValue);
+  }
+  handleSortChange() {
+    this.foodList.updateSortItem(this.sortDropdown.selectValue);
+  }
+  handleSubmit(foodItem) {
+    this.foodList.updateAddItem(foodItem);
+    this.modal.close();
+  }
+  render() {
+    this.container.innerHTML = "";
     const body = document.querySelector("body");
     body.appendChild(this.modal.element);
     body.appendChild(Header({ title: "점심 뭐 먹지?", onAddClick: () => this.modal.open() }));
     body.appendChild(this.tabMenu.element);
     body.appendChild(this.container);
-    this.render();
+    this.renderDynamicSection();
   }
-  getFoodListElement() {
-    if (this.tabMenu.currentMenu === "favorite") {
-      this.foodList.filterFavoriteItem();
-      return this.foodList.element;
-    }
-    this.foodList.resetFavoriteFilter();
-    return this.foodList.element;
-  }
-  render() {
-    this.container.innerHTML = "";
-    if (this.dropdownContainer.element) {
-      this.container.appendChild(this.dropdownContainer.element);
-    }
-    this.container.appendChild(this.getFoodListElement());
-  }
-  handleSubmit(formData) {
-    this.foodList.addItem(formData);
-    this.modal.close();
+  renderDynamicSection() {
+    this.container.appendChild(this.dropdownContainer.element);
+    this.container.appendChild(this.foodList.element);
   }
 }
 window.addEventListener("load", () => {
