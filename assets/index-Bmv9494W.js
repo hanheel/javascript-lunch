@@ -262,6 +262,10 @@ function alertError(error) {
     }, 1500);
   }
 }
+const DEV_ERROR_MESSAGE = {
+  invalidElement: "올바르지 않은 요소입니다.",
+  notFound: (element) => `${element} : 요소를 찾을 수 없습니다.`
+};
 class FoodForm {
   constructor({ onCancel = () => {
   }, onSubmit = () => {
@@ -338,6 +342,9 @@ class FoodForm {
         onSubmit(formData);
         this.container.reset();
       } catch (error) {
+        if (!(error instanceof Error)) {
+          throw new Error(DEV_ERROR_MESSAGE.invalidElement);
+        }
         const customError = error;
         alertError(customError.message);
       }
@@ -346,11 +353,16 @@ class FoodForm {
   getFormInputs() {
     const formData = new FormData(this.container);
     const formObject = Object.fromEntries(formData.entries());
-    return {
-      ...formObject,
+    const foodItem = {
       id: crypto.randomUUID(),
-      isFavorite: false
+      isFavorite: false,
+      name: String(formObject.name),
+      category: String(formObject.category),
+      distance: String(formObject.distance),
+      description: String(formObject.description),
+      link: String(formObject.link)
     };
+    return foodItem;
   }
   validateFoodForm(formData) {
     validateRequiredInput(formData.category);
@@ -460,35 +472,42 @@ class FoodItem {
   }
   setUpFavoriteToggle() {
     const bookmarkIcon = this.container.querySelector(".favorite-icon");
-    if (!bookmarkIcon) return;
+    if (!bookmarkIcon) {
+      throw new Error(DEV_ERROR_MESSAGE.notFound("favorite-icon"));
+    }
     bookmarkIcon.addEventListener("click", this.handleFavoriteClick.bind(this));
   }
   handleFavoriteClick(event) {
     event.stopPropagation();
-    this.updateFavoriteIcon();
     __privateGet(this, _onFavoriteClick).call(this, __privateGet(this, _data).id);
     this.render();
+    this.updateFavoriteIcon();
   }
   updateFavoriteIcon() {
     const bookmarkIcon = this.container.querySelector(".favorite-icon");
-    if (!bookmarkIcon) return;
+    if (!bookmarkIcon) {
+      throw new Error(DEV_ERROR_MESSAGE.notFound("favorite-icon"));
+    }
     bookmarkIcon.setAttribute("src", this.getBookmarkIconSrc());
   }
   getBookmarkIconSrc() {
-    if (__privateGet(this, _data).isFavorite) {
-      return "./favorite-icon-filled.png";
-    }
-    return "./favorite-icon-lined.png";
+    return __privateGet(this, _data).isFavorite ? "./favorite-icon-filled.png" : "./favorite-icon-lined.png";
   }
   setDetailCss() {
-    var _a;
+    const listItem = this.container.querySelector("li");
+    if (!listItem) {
+      throw new Error(DEV_ERROR_MESSAGE.notFound("listItem"));
+    }
     if (__privateGet(this, _cssType) === "column") {
-      (_a = this.container.querySelector("li")) == null ? void 0 : _a.classList.add("restaurant-detail");
+      listItem.classList.add("restaurant-detail");
     }
   }
   setUpDetailModal() {
-    var _a;
-    (_a = this.container.querySelector("li")) == null ? void 0 : _a.addEventListener("click", () => {
+    const listItem = this.container.querySelector("li");
+    if (!listItem) {
+      throw new Error(DEV_ERROR_MESSAGE.notFound("listItem"));
+    }
+    listItem.addEventListener("click", () => {
       __privateGet(this, _onFoodItemClick).call(this, __privateGet(this, _data));
     });
   }
@@ -618,9 +637,10 @@ class FoodList {
           this.renderDetailModal(foodItem2);
         }
       }).element;
-      if (foodItemElement) {
-        foodFragment.appendChild(foodItemElement);
+      if (!foodItemElement) {
+        throw new Error(DEV_ERROR_MESSAGE.notFound("foodItemElement"));
       }
+      foodFragment.appendChild(foodItemElement);
     });
     this.foodList.appendChild(foodFragment);
   }
@@ -639,7 +659,9 @@ class FoodList {
       onFoodItemClick: () => {
       }
     });
-    if (!detailFoodItem.element) return;
+    if (!detailFoodItem.element) {
+      throw new Error(DEV_ERROR_MESSAGE.notFound("detailFoodItem.element"));
+    }
     fragment.appendChild(detailFoodItem.element);
     const buttonContainer = ButtonContainer({
       buttons: [
@@ -667,7 +689,7 @@ class FoodList {
   }
   updateAddItem(foodItem) {
     this.foodListManager.addItem(foodItem);
-    this.render();
+    this.render(this.foodListManager.processFoodItems());
   }
   updateFavoriteItem(id) {
     this.foodListManager.toggleFavoriteFoodItem(id);
@@ -676,23 +698,20 @@ class FoodList {
   updateDeleteItem(id) {
     if (confirm(DELETE)) {
       this.foodListManager.deleteFoodItem(id);
-      this.render();
+      this.render(this.foodListManager.processFoodItems());
     }
   }
   updateFilterItem(category) {
     this.foodListManager.setFilterType(category);
-    const filteredItems = this.foodListManager.processFoodItems();
-    this.render(filteredItems);
+    this.render(this.foodListManager.processFoodItems());
   }
   updateSortItem(sortType) {
     this.foodListManager.setSortType(sortType);
-    const sortedItems = this.foodListManager.processFoodItems();
-    this.render(sortedItems);
+    this.render(this.foodListManager.processFoodItems());
   }
   updateFavoriteList(tabMenu) {
     this.foodListManager.setCurrentMenu(tabMenu);
-    const favoriteItems = this.foodListManager.processFoodItems();
-    this.render(favoriteItems);
+    this.render(this.foodListManager.processFoodItems());
   }
 }
 function IconButton({ cssType = "primary", name, imgSrc, label, onClick = () => {
@@ -751,11 +770,16 @@ class TabMenu {
     this.handleCurrentMenu();
   }
   handleCurrentMenu() {
-    var _a;
-    (_a = this.container.querySelectorAll(".tabmenu-item")) == null ? void 0 : _a.forEach(
+    const tabMenuItem = this.container.querySelectorAll(".tabmenu-item");
+    if (!tabMenuItem) {
+      throw new Error(DEV_ERROR_MESSAGE.notFound("tabmenu-item"));
+    }
+    tabMenuItem.forEach(
       (tabMenu) => tabMenu.addEventListener("click", (event) => {
         const target = event.target;
-        if (!target) return;
+        if (!(target instanceof HTMLButtonElement)) {
+          throw new Error(DEV_ERROR_MESSAGE.invalidElement);
+        }
         const currentMenu = target.dataset.tab;
         if (currentMenu === "all" || currentMenu === "favorite") {
           __privateSet(this, _currentMenu2, currentMenu);
@@ -766,9 +790,15 @@ class TabMenu {
     );
   }
   setActiveTabStyle() {
-    var _a, _b;
-    (_a = this.container.querySelector(".tabmenu--active")) == null ? void 0 : _a.classList.remove("tabmenu--active");
-    (_b = this.container.querySelector(`[data-tab=${__privateGet(this, _currentMenu2)}]`)) == null ? void 0 : _b.classList.add("tabmenu--active");
+    const tabMenuActiveClass = this.container.querySelector(".tabmenu--active");
+    if (tabMenuActiveClass) {
+      tabMenuActiveClass.classList.remove("tabmenu--active");
+    }
+    const currentMenuTab = this.container.querySelector(`[data-tab=${__privateGet(this, _currentMenu2)}]`);
+    if (!currentMenuTab) {
+      throw new Error(DEV_ERROR_MESSAGE.notFound(`[data-tab=${__privateGet(this, _currentMenu2)}]`));
+    }
+    currentMenuTab.classList.add("tabmenu--active");
   }
 }
 _currentMenu2 = new WeakMap();

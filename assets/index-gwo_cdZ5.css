@@ -34,7 +34,7 @@
 
 .restaurant-detail {
   flex-direction: column;
-  gap: 2rem;
+  gap: 32px;
 }
 
 .restaurant-list-container {
@@ -85,7 +85,7 @@
   flex-direction: column;
   justify-content: flex-start;
   width: 100%;
-  gap: 0.5rem;
+  gap: 8px;
 }
 
 .restaurant__name {
@@ -116,16 +116,16 @@
 
 .alert {
   position: fixed;
-  top: 8rem;
+  top: 128px;
   left: 50%;
   transform: translate(-50%, -50%);
   justify-content: center;
   z-index: 1000;
   display: inline-block;
-  padding: 0.8rem 1rem;
+  padding: 12.8px 16px;
   background-color: var(--alert);
   color: white;
-  border-radius: 10rem;
+  border-radius: 160px;
   animation: fadeDown 0.3s ease;
 }
 
@@ -271,7 +271,7 @@
   width: 100%;
   text-align: center;
   color: var(--grey-300);
-  padding: 1rem;
+  padding: 16px;
   border-bottom: 2px solid var(--grey-200);
   transition: 0.3s ease;
   &:hover {
@@ -322,7 +322,7 @@ input[name="link"] {
 
 .empty-message {
   text-align: center;
-  padding: 1rem;
+  padding: 16px;
 }
 
 * {
