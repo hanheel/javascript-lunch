@@ -613,7 +613,6 @@ class FoodList {
     this.foodListManager = new FoodListManager(foodItems);
     this.foodList = document.createElement("ul");
     this.foodList.className = "restaurant-list";
-    console.log(foodItems);
     this.updateSortItem("이름순");
   }
   get element() {
