@@ -8,7 +8,7 @@ var __accessCheck = (obj, member, msg) => member.has(obj) || __typeError("Cannot
 var __privateGet = (obj, member, getter) => (__accessCheck(obj, member, "read from private field"), getter ? getter.call(obj) : member.get(obj));
 var __privateAdd = (obj, member, value) => member.has(obj) ? __typeError("Cannot add the same private member more than once") : member instanceof WeakSet ? member.add(obj) : member.set(obj, value);
 var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "write to private field"), setter ? setter.call(obj, value) : member.set(obj, value), value);
-var _selectValue, _isOpen, _content, _container, _data, _cssType, _onFavoriteClick, _onDeleteClick, _onFoodItemClick, _foodItems, _selectedFilter, _selectedSortType, _currentMenu, _currentMenu2, _onTabChange;
+var _selectValue, _isOpen, _content, _container, _data, _cssType, _onFavoriteClick, _onFoodItemClick, _foodItems, _selectedFilter, _selectedSortType, _currentMenu, _currentMenu2, _onTabChange;
 (function polyfill() {
   const relList = document.createElement("link").relList;
   if (relList && relList.supports && relList.supports("modulepreload")) {
@@ -52,11 +52,10 @@ class Dropdown {
     __publicField(this, "name");
     __publicField(this, "options");
     __publicField(this, "onChange");
-    __privateAdd(this, _selectValue);
+    __privateAdd(this, _selectValue, "");
     this.container = document.createElement("div");
     this.options = options;
     this.name = name;
-    __privateSet(this, _selectValue, "이름순");
     this.onChange = onChange;
     this.render();
     this.setDropdownValue();
@@ -78,10 +77,9 @@ class Dropdown {
     this.container.querySelectorAll("select").forEach(
       (element) => element.addEventListener("change", (event) => {
         const target = event.target;
-        if (target instanceof HTMLSelectElement) {
-          __privateSet(this, _selectValue, target.value);
-          this.onChange(__privateGet(this, _selectValue));
-        }
+        if (!(target instanceof HTMLSelectElement)) return;
+        __privateSet(this, _selectValue, target.value);
+        this.onChange(__privateGet(this, _selectValue));
       })
     );
   }
@@ -264,8 +262,17 @@ function alertError(error) {
 }
 const DEV_ERROR_MESSAGE = {
   invalidElement: "올바르지 않은 요소입니다.",
-  notFound: (element) => `${element} : 요소를 찾을 수 없습니다.`
+  notFound: (element) => `${element} : 요소를 찾을 수 없습니다.`,
+  invalidErrorObject: "Error 인스턴스가 아닌 예외가 발생했습니다."
 };
+function isCategoryType(category) {
+  const CATEGORY_VALUES = ["한식", "양식", "일식", "중식", "기타", "아시안"];
+  return CATEGORY_VALUES.includes(category);
+}
+function isDistanceType(value) {
+  const DISTANCE_VALUES = ["5", "10", "15", "20", "30"];
+  return DISTANCE_VALUES.includes(value);
+}
 class FoodForm {
   constructor({ onCancel = () => {
   }, onSubmit = () => {
@@ -343,22 +350,25 @@ class FoodForm {
         this.container.reset();
       } catch (error) {
         if (!(error instanceof Error)) {
-          throw new Error(DEV_ERROR_MESSAGE.invalidElement);
+          throw new Error(DEV_ERROR_MESSAGE.invalidErrorObject);
         }
-        const customError = error;
-        alertError(customError.message);
+        alertError(error.message);
       }
     };
   }
   getFormInputs() {
     const formData = new FormData(this.container);
     const formObject = Object.fromEntries(formData.entries());
+    const category = String(formObject.category);
+    if (!isCategoryType(category)) throw new Error("잘못된 카테고리");
+    const distance = String(formObject.distance);
+    if (!isDistanceType(distance)) throw new Error("잘못된 거리");
     const foodItem = {
       id: crypto.randomUUID(),
       isFavorite: false,
       name: String(formObject.name),
-      category: String(formObject.category),
-      distance: String(formObject.distance),
+      category,
+      distance,
       description: String(formObject.description),
       link: String(formObject.link)
     };
@@ -369,8 +379,12 @@ class FoodForm {
     validateRequiredInput(formData.name);
     validateLength(formData.name, NAME_MAX_LENGTH);
     validateRequiredInput(formData.distance);
-    validateLength(formData.description, DESCRIPTION_MAX_LENGTH);
-    validateURL(formData.link);
+    if (formData.description) {
+      validateLength(formData.description, DESCRIPTION_MAX_LENGTH);
+    }
+    if (formData.link) {
+      validateURL(formData.link);
+    }
   }
   get element() {
     return this.container;
@@ -424,17 +438,15 @@ function getImgSrcAlt(category) {
   return categoryMap[category] || categoryMap["기타"];
 }
 class FoodItem {
-  constructor({ data, cssType, onFavoriteClick, onDeleteClick, onFoodItemClick }) {
+  constructor({ data, cssType, onFavoriteClick, onFoodItemClick }) {
     __publicField(this, "container");
     __privateAdd(this, _data);
     __privateAdd(this, _cssType);
     __privateAdd(this, _onFavoriteClick);
-    __privateAdd(this, _onDeleteClick);
     __privateAdd(this, _onFoodItemClick);
     __privateSet(this, _data, data);
     __privateSet(this, _cssType, cssType);
     __privateSet(this, _onFavoriteClick, onFavoriteClick);
-    __privateSet(this, _onDeleteClick, onDeleteClick);
     __privateSet(this, _onFoodItemClick, onFoodItemClick);
     this.container = document.createElement("div");
     this.render();
@@ -511,27 +523,18 @@ class FoodItem {
       __privateGet(this, _onFoodItemClick).call(this, __privateGet(this, _data));
     });
   }
-  handleDeleteClick() {
-    if (confirm(DELETE)) {
-      __privateGet(this, _onDeleteClick).call(this, __privateGet(this, _data).id);
-    }
-  }
 }
 _data = new WeakMap();
 _cssType = new WeakMap();
 _onFavoriteClick = new WeakMap();
-_onDeleteClick = new WeakMap();
 _onFoodItemClick = new WeakMap();
+const FOOD_ITEMS_KEY = "foodItems";
 function storeFoodItems(foodItems) {
-  localStorage.setItem("foodItems", JSON.stringify(foodItems));
+  localStorage.setItem(FOOD_ITEMS_KEY, JSON.stringify(foodItems));
 }
 function getStoredFoodItems() {
-  const storedItems = localStorage.getItem("foodItems");
+  const storedItems = localStorage.getItem(FOOD_ITEMS_KEY);
   return storedItems ? JSON.parse(storedItems) : [];
-}
-function removeStoredFoodItem(id) {
-  const filteredItems = getStoredFoodItems().filter((item) => item.id !== id);
-  localStorage.setItem("foodItems", JSON.stringify(filteredItems));
 }
 function filterFoodItemsByCategory(category, foodItems) {
   if (category === "") {
@@ -544,7 +547,7 @@ function sortFoodItem(sortOption, foodItems) {
     foodItems.sort((a, b) => a.name.localeCompare(b.name));
   }
   if (sortOption === "거리순") {
-    foodItems.sort((a, b) => a.distance - b.distance);
+    foodItems.sort((a, b) => Number(a.distance) - Number(b.distance));
   }
   return foodItems;
 }
@@ -578,7 +581,6 @@ class FoodListManager {
     storeFoodItems(__privateGet(this, _foodItems));
   }
   deleteFoodItem(id) {
-    removeStoredFoodItem(id);
     __privateSet(this, _foodItems, __privateGet(this, _foodItems).filter((foodItem) => foodItem.id !== id));
     storeFoodItems(__privateGet(this, _foodItems));
   }
@@ -611,6 +613,7 @@ class FoodList {
     this.foodListManager = new FoodListManager(foodItems);
     this.foodList = document.createElement("ul");
     this.foodList.className = "restaurant-list";
+    console.log(foodItems);
     this.updateSortItem("이름순");
   }
   get element() {
